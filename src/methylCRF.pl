@@ -27,11 +27,15 @@ my (
   $fragdir, # dir with MRE enzyme frag files -will detect if it's instead a filename and use that
   $gapsz,   # size of gap
   $eid,     # prefix for output files
-  $startfrom # control which processes run
+  $startfrom, # control which processes run
+  $goto,      # do go past this 
 ) = @ARGV;
 
 my ($crffn,$cutfn,$cpgfn,$gdatfn,$fragfn) = 
    ("$mdldir/crf.list","$mdldir/cut.list","$gdatdir/cpg.bed","$gdatdir/gdata.tbl",$fragdir);
+
+if (!defined $startfrom) {$startfrom=1}
+if (!defined $goto)      {$goto=5     }
 
 if (-d $fragdir) { $fragfn  = ${eid}."_".qx(basename $fragdir); chomp $fragfn; }
 
@@ -47,20 +51,20 @@ if (-d $fragdir) { $fragfn  = ${eid}."_".qx(basename $fragdir); chomp $fragfn; }
 ## 0: Get and Format DIP/MRE data ##
 
 # make correct bed files from handler output (dipfn.bed,mrefn.bed)
-if ($startfrom <=0) {
+if ($startfrom <=0 && $goto >= 0) {
   print STDERR scalar localtime(), " format $dipfn and $mrefn\n";
   format_DIPMRE($dipfn,$mrefn,$cpgfn) 
 }
 
 ## 1: generate windowed files ({e}_DIP_d{d}.cnt, {e}_MRE_d{d}.cnt)
-if ($startfrom <=1) {
+if ($startfrom <=1 && $goto >= 1) {
   print STDERR scalar localtime(), " make avg windows for $dipfn and $mrefn\n";
   # makes e_DIPMRE.cnt
   gen_avgwindows($eid,"$dipfn.norm.bed","$mrefn.bed",$cpgfn, "0 10 100 1000 10000") ;
 }
 
 ## 2: make MRE frag file
-if ($startfrom <=2) {
+if ($fragdir ne $fragfn && $startfrom <=2 && $goto>=2 ) {
   print STDERR scalar localtime(), " make MRE frag in $fragdir\n";
   make_fragfn($fragdir,$cpgfn,$fragfn);
 }
@@ -99,7 +103,7 @@ for (qx(cat $cutfn)) {
 
 
 
-if ($startfrom <=3) {
+if ($startfrom <=3 && $goto>=3) {
   print STDERR scalar localtime(), " make table\n";
  # local $| = 1;
   # get common filehandles
@@ -156,25 +160,27 @@ if ($startfrom <=3) {
 
 
 ## 3: Predict ##
-if ($startfrom <= 4) {
+if ($startfrom <= 4 && $goto>=4) {
   print STDERR scalar localtime(), " predict\n";
   predict($bin,\@tblfn,\@crf,$mdldir, $eid) 
 }
   
 
 ## 4: Combine ##
+if ($goto>=5) {
 # midpt map
-my $midpt = midpt_map(\@crf,\%cut,1);
+  my $midpt = midpt_map(\@crf,\%cut,1);
 
-# reset fh posn
-$CPG->seek(0,0);
-for (@CLS) { $_->seek(0,0)}
+  # reset fh posn
+  $CPG->seek(0,0);
+  for (@CLS) { $_->seek(0,0)}
 
 #prints to stdout
-print STDERR scalar localtime(), " making ensemble prediction\n";
-combine(\@CLS,\@tblfn,$midpt, $CPG);
-print STDERR scalar localtime(), " fin\n";
+  print STDERR scalar localtime(), " making ensemble prediction\n";
+  combine(\@CLS,\@tblfn,$midpt, $CPG);
+  print STDERR scalar localtime(), " fin\n";
 
+}
 
 
 

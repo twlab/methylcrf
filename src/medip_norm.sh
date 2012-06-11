@@ -23,7 +23,7 @@ p75cnt=$(awk '($5!=0){print $5}' $dipreadbed |sort -rn|head -$p75|tail -n 1)
 echo "p75:$p75 P75cnt:$p75cnt" >&2
 
 ## ~8Gb
-dipcpgbed=${dip/.bed/}_$cpg
+dipcpgbed=${dip/.bed/}_$(basename $cpg)
 olapBed -c $cpg $dip | awk '{OFS="\t";$5=$NF;NF=5;print}' > $dipcpgbed
 
 # split count amongst cpgs and normalize (mutiplicatively) so 75th percentile will be 10
