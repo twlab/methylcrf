@@ -47,6 +47,7 @@ if (-d $fragdir) { $fragfn  = ${eid}."_".qx(basename $fragdir); chomp $fragfn; }
 # 3 make tables  (1.5hr)
 # 4 predict
 # 5 combine
+# 6 make dirs to put extra files in [have to give explicitely]
 
 
 ## 0: Get and Format DIP/MRE data ##
@@ -166,7 +167,7 @@ if ($startfrom <= 4 && $goto>=4) {
   
 
 ## 4: Combine ##
-if ($goto>=5) {
+if ($startfrom<= 5 && $goto>=5) {
 # midpt map
   my $midpt = midpt_map(\@crf,\%cut,1);
 
@@ -181,6 +182,13 @@ if ($goto>=5) {
 
 }
 
+if ($goto>='cleanup') {
+  my $d="${eid}_err";qx(mkdir $d; mv *err $d/);
+  $d="${eid}_tbl";qx(mkdir $d; mv *tbl $d/);
+  $d="${eid}_out";qx(mkdir $d; mv *out $d/);
+  $d="${eid}_cnt";qx(mkdir $d; mv *cnt $d/);
+  $d="${eid}_bed";qx(mkdir $d; mv *bed_cpg.bed *read.bed *norm.bed *extended.bed *bedGraph $d/);
+}
 
 
 
