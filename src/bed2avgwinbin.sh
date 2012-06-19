@@ -13,9 +13,10 @@ tmp=$(mktemp $0.XXXXXX.tmp)
 for d in $win; do
   echo "$d" >&2
   awk '{OFS="\t";$2-=($2<D)?0:D;$3+=D;print}' D=$d $cpg > $tmp 
-  olapBed -s $bed $tmp 2>$0.$bed.$d.err| awk '{printf("%s\t%."F"f\n",$4,$NF)}' F=$fmt >${outtmp}_d${d}.cnt
+  out=${outtmp}_d${d}.cnt
+  olapBed -s $bed $tmp | awk '{printf("%s\t%."F"f\n",$4,$NF)}' F=$fmt >$out
+  ls -l $out  >&2
 done;
 rm $tmp
 
-ls -l ${dip/.bed}_d${d}.cnt  >&2
 
