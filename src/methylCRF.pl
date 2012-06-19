@@ -16,6 +16,7 @@ sub getlines { my ($self) = @_; return map { chomp; $_ } $self->SUPER::getlines(
 
 
 package main;
+#select(STDERR); $| = 1; select(STDOUT);
 
 my $bin     = "./crfsgd";
 my @windist = (0,10,100,1000,10000);
@@ -100,14 +101,11 @@ for (qx(cat $cutfn)) {
 
 
 ## 2: Make Tables ##
-
-
-
 if ($startfrom <=3 && $goto>=3) {
   print STDERR scalar localtime(), " make table\n";
  # local $| = 1;
   # get common filehandles
-  my $EFN  = IO::File::AutoChomp->new("${eid}_DIPMRE.cnt", 'r') or die "can't open DIPMRE.cnt $_: $!";
+  my $EFN  = IO::File::AutoChomp->new("${eid}_DIPMRE.cnt", 'r') or die "can't open ${eid}_DIPMRE.cnt $_: $!";
   my $FRAG = IO::File::AutoChomp->new($fragfn,'r') or die "can't open $fragfn: $!";
   my $GDAT = IO::File::AutoChomp->new($gdatfn,'r') or die "can't open $gdatfn: $!";
   my @gdat_hdr = split /\t/,$GDAT->getline();
@@ -146,8 +144,7 @@ if ($startfrom <=3 && $goto>=3) {
       $OUT->print( $frag, "\t");
 
       # all other cols (no autochomp) 
-      #$gdat =~ s/.*?\t//; #(cut off chrx.x)
-      #$OUT->print($gdat);
+      #$gdat =~ s/.*?\t//; #(cut off chrx.x) #$OUT->print($gdat);
       $OUT->print( ($gdat[$_]==-1 ? -1 : binon( $cut{ "${crfnm}__$gdat_hdr[$_]" },$gdat[$_] )),"\t" ) for (1..$#gdat_hdr-1);
       $OUT->print( ($gdat[-1]==-1 ? -1 : binon( $cut{ "${crfnm}__$gdat_hdr[-1]" },$gdat[-1] )),"\n" );
 
@@ -155,7 +152,9 @@ if ($startfrom <=3 && $goto>=3) {
     }
   }
   # add empty last line (maybe didn't work..)
-    for (@OUT) { $_->say("");}
+    for (@OUT) { $_->say("");$_->close}
+    
+  for (@tblfn){ qx((echo $_;tail -n -1 $_|awk '{print NF}') >&2) }
 }
 
 
@@ -185,7 +184,6 @@ if ($goto>=5) {
 
 
 
-
 sub format_DIPMRE {
   my ($dfn,$mfn,$cfn) = @_;
   qx(awk '(c != \$1){i=0}{OFS="\t";print \$1,\$2,\$3,"dip."\$1"."(++i),1;c=\$1}' $dfn |sort -Vk1,3 > $dfn.bed) == 0 
@@ -194,7 +192,7 @@ sub format_DIPMRE {
     or die "$0: make mre.bed " . ($? >> 8);
 
 # do medip norm
-  qx(medip_norm.sh $dfn.bed $cfn  >$dfn.norm.bed 2>$dfn.norm.err) == 0 
+  qx(medip_norm.sh $dfn.bed $cfn  >$dfn.norm.bed) == 0 
     or die "$0: medip_norm " . ($? >> 8);
 
  qx(ls -l $dfn.bed $mfn.bed $dfn.norm.bed >&2);
@@ -202,16 +200,17 @@ sub format_DIPMRE {
 
 sub gen_avgwindows {
   my ($e,$dfn,$mfn,$cfn,$win) = @_;
-  qx(bed2avgwinbin.sh $dfn $cfn "$win" ${e}_DIP 2>${e}_DIP_avgwin.err) == 0
-    or die "$0: bed2avgwingin(DIP) " . ($? >> 8);
-  qx(bed2avgwinbin.sh $mfn $cfn "$win" ${e}_MRE 2>${e}_MRE_avgwin.err) == 0
-    or die "$0: bed2avgwingin(MRE) " . ($? >> 8);
+  qx(bed2avgwinbin.sh $dfn $cfn "$win" ${e}_DIP) == 0 or die "$0: bed2avgwingin(DIP) " . ($? >> 8);
+  qx(bed2avgwinbin.sh $mfn $cfn "$win" ${e}_MRE) == 0 or die "$0: bed2avgwingin(MRE) " . ($? >> 8);
+
+  qx(for i in $win; do for a in DIP MRE; do wc ${e}_\${a}_d\${i}.cnt; done;done >&2);
 
   my $dip = join " ", map{"<\(cut -f2 ${e}_DIP_d${_}.cnt)"} (split /\W/,$win);
   my $mre = join " ", map{"<\(cut -f2 ${e}_MRE_d${_}.cnt)"} (split /\W/,$win);
   my $out = "${e}_DIPMRE.cnt"; 
   system("bash","-c", "paste $dip $mre > $out") == 0 or die "$0: gen_avgwin(paste) " . ($? >> 8);
-   qx(ls -l $out >&2);
+
+  qx((echo $out "column number";awk '{print NF}' $out |sort -u) >&2);
   # del cnt files??
 }
 
@@ -223,11 +222,11 @@ sub make_fragfn {
 sub predict {
   my ($bin, $tfn,$crf,$mdldir,$e) = @_;
   for (0..$#$tfn) {
-    my $mdl="$mdldir/$crf->[$_].mdl.gz";
+    my $mdl="$mdldir/$crf->[$_].mdl";
     my $out="$tfn->[$_].out";
     print STDERR "predict: [$crf->[$_]] [$mdl]\n";
-    qx($bin -t $mdl $tfn->[$_] 2>$out.err |awk '(NF){print \$NF}' >$out) == 0
-    or die "$0: crfsgd " . ($? >> 8);
+   # print qq($bin -t $mdl $tfn->[$_]);exit;
+    qx($bin -t $mdl $tfn->[$_]  |awk '(NF){print \$NF}' >$out) == 0 or die "$0: crfsgd " . ($? >> 8);
 
     qx(ls -l $out >&2);
 }
@@ -265,7 +264,7 @@ sub combine {
 
 sub binon {
   my ($cut,$v, $nobin) = @_;
-  if ($v eq $nobin) {return $v};
+#  if ($v eq $nobin) {return $v};
   #NOTE: v can be < cut[0] if binning was done on small samples
   my $idx=1; while ($idx <= $#$cut && $v >= $cut->[$idx]) {$idx++}
   return  $cut->[$idx-1];
