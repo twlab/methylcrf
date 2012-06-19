@@ -206,7 +206,11 @@ int main ( int argc, char *argv[] ) {
         }
       }
       if (print_all || r->Size() > 0) printf("\n");
+     //r->Clear(delete);
+     delete r;
+
     } else if (print_all) { print_bed(cbed); ocount ? printf("\t0\n") : printf("\n"); }
+   //delete cbed->chr;delete cbed->id;delete cbed->strand;delete cbed->otro;
   }
   // can't close istream, not sure what to do
   //fh.close(); 
