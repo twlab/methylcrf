@@ -1818,7 +1818,8 @@ parseCmdLine(int argc, char **argv)
           else if (s[0] == 'f')
             {
               cutoff = atoi(argv[i]);
-              if (cutoff <= 0 || cutoff > 1000)
+              //ms: if (cutoff <= 0 || cutoff > 1000)
+              if (cutoff <= 0)
                 {
                   cerr << "ERROR: " 
                        << "Illegal cutoff value: " << cutoff << endl;

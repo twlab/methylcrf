@@ -1,4 +1,21 @@
 #!/bin/bash
+#------------------------------------------------------------------------#
+# Copyright 2012                                                         #
+# Author: stevens _at_ cse.wustl.edu (from Ting Wang original)           #
+#                                                                        #
+# This program is free software: you can redistribute it and/or modify   #
+# it under the terms of the GNU General Public License as published by   #
+# the Free Software Foundation, either version 3 of the License, or      #
+# (at your option) any later version.                                    #
+#                                                                        #
+# This program is distributed in the hope that it will be useful,        #
+# but WITHOUT ANY WARRANTY; without even the implied warranty of         #
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the          #
+# GNU General Public License for more details.                           #
+#                                                                        #
+# You should have received a copy of the GNU General Public License      #
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.  #
+#------------------------------------------------------------------------#
 
 # req 
 #  olapBed
@@ -15,7 +32,7 @@ for d in $win; do
   awk '{OFS="\t";$2-=($2<D)?0:D;$3+=D;print}' D=$d $cpg > $tmp 
   out=${outtmp}_d${d}.cnt
   olapBed -s $bed $tmp | awk '{printf("%s\t%."F"f\n",$4,$NF)}' F=$fmt >$out
-  ls -l $out  >&2
+#  ls -l $out  >&2
 done;
 rm $tmp
 

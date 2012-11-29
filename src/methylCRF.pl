@@ -1,4 +1,21 @@
 #!/usr/bin/env perl
+#------------------------------------------------------------------------#
+# Copyright 2012                                                         #
+# Author: stevens _at_ cse.wustl.edu (from Ting Wang original)           #
+#                                                                        #
+# This program is free software: you can redistribute it and/or modify   #
+# it under the terms of the GNU General Public License as published by   #
+# the Free Software Foundation, either version 3 of the License, or      #
+# (at your option) any later version.                                    #
+#                                                                        #
+# This program is distributed in the hope that it will be useful,        #
+# but WITHOUT ANY WARRANTY; without even the implied warranty of         #
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the          #
+# GNU General Public License for more details.                           #
+#                                                                        #
+# You should have received a copy of the GNU General Public License      #
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.  #
+#------------------------------------------------------------------------#
 
 use strict;
 # NOTES #
@@ -10,15 +27,14 @@ use strict;
 #        --maybe switch to filehandle --it's on the system, so maybe it's std
 package IO::File::AutoChomp;
 use base 'IO::File';
-sub getline  { my $v = readline($_[0]) || die "readline failed: $!";chomp $v;return $v}
+sub getline  { my $v = readline($_[0]) || die "readline failed: [$_[0]] $!";chomp $v;return $v}
 sub getlines { my ($self) = @_; return map { chomp; $_ } $self->SUPER::getlines(); }
 
 
 
 package main;
-#select(STDERR); $| = 1; select(STDOUT);
 
-my $bin     = "./crfsgd";
+my $bin     = "./crfasgd";
 my @windist = (0,10,100,1000,10000);
 my (
   $mdldir,  # has one model file per crf
@@ -35,7 +51,7 @@ my (
 my ($crffn,$cutfn,$cpgfn,$gdatfn,$fragfn) = 
    ("$mdldir/crf.list","$mdldir/cut.list","$gdatdir/cpg.bed","$gdatdir/gdata.tbl",$fragdir);
 
-if (!defined $startfrom) {$startfrom=1}
+if (!defined $startfrom) {$startfrom=0}
 if (!defined $goto)      {$goto=5     }
 
 if (-d $fragdir) { $fragfn  = ${eid}."_".qx(basename $fragdir); chomp $fragfn; }
@@ -62,13 +78,13 @@ if ($startfrom <=0 && $goto >= 0) {
 if ($startfrom <=1 && $goto >= 1) {
   print STDERR scalar localtime(), " make avg windows for $dipfn and $mrefn\n";
   # makes e_DIPMRE.cnt
-  gen_avgwindows($eid,"$dipfn.norm.bed","$mrefn.bed",$cpgfn, "0 10 100 1000 10000") ;
+  gen_avgwindows($eid,"$dipfn.norm.bed",$mrefn,$cpgfn, "0 10 100 1000 10000") ;
 }
 
 ## 2: make MRE frag file
 if ($fragdir ne $fragfn && $startfrom <=2 && $goto>=2 ) {
   print STDERR scalar localtime(), " make MRE frag in $fragdir\n";
-  make_fragfn($fragdir,$cpgfn,$fragfn);
+  make_fragfn($fragdir,$cpgfn,"$fragfn.bin");
 }
  
 
@@ -104,7 +120,6 @@ for (qx(cat $cutfn)) {
 ## 2: Make Tables ##
 if ($startfrom <=3 && $goto>=3) {
   print STDERR scalar localtime(), " make table\n";
- # local $| = 1;
   # get common filehandles
   my $EFN  = IO::File::AutoChomp->new("${eid}_DIPMRE.cnt", 'r') or die "can't open ${eid}_DIPMRE.cnt $_: $!";
   my $FRAG = IO::File::AutoChomp->new($fragfn,'r') or die "can't open $fragfn: $!";
@@ -137,15 +152,14 @@ if ($startfrom <=3 && $goto>=3) {
       {$OUT->say("");}
 
       # MRE and MeDIP cols
-      $OUT->print( ($dipmre[$_]           ==-1 ? -1 : binon( $cut{ "${crfnm}__H1ES_DIP_d$windist[$_]" },$dipmre[$_]          )),"\t" ) for (0..$#windist);
-      $OUT->print( ($dipmre[ $_+@windist ]==-1 ? -1 : binon( $cut{ "${crfnm}__H1ES_MRE_d$windist[$_]" },$dipmre[$_+@windist] )),"\t" ) for (0..$#windist);
+      $OUT->print( ($dipmre[$_]           ==-1 ? -1 : binon( $cut{ "${crfnm}__DIP_d$windist[$_]" },$dipmre[$_]          )),"\t" ) for (0..$#windist);
+      $OUT->print( ($dipmre[ $_+@windist ]==-1 ? -1 : binon( $cut{ "${crfnm}__MRE_d$windist[$_]" },$dipmre[$_+@windist] )),"\t" ) for (0..$#windist);
 
       # mre frag 
       die "no frag at cpg $cpg[3]" unless defined $frag;
       $OUT->print( $frag, "\t");
 
       # all other cols (no autochomp) 
-      #$gdat =~ s/.*?\t//; #(cut off chrx.x) #$OUT->print($gdat);
       $OUT->print( ($gdat[$_]==-1 ? -1 : binon( $cut{ "${crfnm}__$gdat_hdr[$_]" },$gdat[$_] )),"\t" ) for (1..$#gdat_hdr-1);
       $OUT->print( ($gdat[-1]==-1 ? -1 : binon( $cut{ "${crfnm}__$gdat_hdr[-1]" },$gdat[-1] )),"\n" );
 
@@ -155,7 +169,7 @@ if ($startfrom <=3 && $goto>=3) {
   # add empty last line (maybe didn't work..)
     for (@OUT) { $_->say("");$_->close}
     
-  for (@tblfn){ qx((echo $_;tail -n -1 $_|awk '{print NF}') >&2) }
+  for (@tblfn){ qx((echo $_;tail -n -2 $_|awk '{print NF}') >&2) }
 }
 
 
@@ -182,59 +196,53 @@ if ($startfrom<= 5 && $goto>=5) {
 
 }
 
-if ($goto>='cleanup') {
-  my $d="${eid}_err";qx(mkdir $d; mv *err $d/);
-  $d="${eid}_tbl";qx(mkdir $d; mv *tbl $d/);
-  $d="${eid}_out";qx(mkdir $d; mv *out $d/);
-  $d="${eid}_cnt";qx(mkdir $d; mv *cnt $d/);
-  $d="${eid}_bed";qx(mkdir $d; mv *bed_cpg.bed *read.bed *norm.bed *extended.bed *bedGraph $d/);
+if ($startfrom == 6) {
+  my $d="${eid}_err";qx(mkdir $d; mv ${eid}*err $d/);
+  $d="${eid}_tbl";qx(mkdir $d; mv ${eid}*tbl $d/);
+  $d="${eid}_out";qx(mkdir $d; mv ${eid}*out $d/);
+  $d="${eid}_cnt";qx(mkdir $d; mv ${eid}*cnt $d/);
+#  $d="${eid}_bed";qx(mkdir $d; mv ${eid}*bed_cpg.bed *read.bed *norm.bed *extended.bed *bedGraph $d/);
 }
 
 
 
 sub format_DIPMRE {
   my ($dfn,$mfn,$cfn) = @_;
-  qx(awk '(c != \$1){i=0}{OFS="\t";print \$1,\$2,\$3,"dip."\$1"."(++i),1;c=\$1}' $dfn |sort -Vk1,3 > $dfn.bed) == 0 
-    or die "$0: make dip.bed " . ($? >> 8);
-  qx(awk '(c != \$1){i=0}{OFS="\t";print \$1,\$2,\$3,"mre."\$1"."(++i),\$4;c=\$1}' $mfn |sort -Vk1,3 > $mfn.bed) == 0 
-    or die "$0: make mre.bed " . ($? >> 8);
-
 # do medip norm
-  qx(medip_norm.sh $dfn.bed $cfn  >$dfn.norm.bed) == 0 
-    or die "$0: medip_norm " . ($? >> 8);
+  qx(medip_norm.sh $dfn $cfn >$dfn.norm.bed ) and $? and die "$0: medip_norm ".($? >> 8);
 
- qx(ls -l $dfn.bed $mfn.bed $dfn.norm.bed >&2);
+ qx(ls -l $dfn $mfn $dfn.norm.bed >&2);
 }
 
 sub gen_avgwindows {
   my ($e,$dfn,$mfn,$cfn,$win) = @_;
-  qx(bed2avgwinbin.sh $dfn $cfn "$win" ${e}_DIP) == 0 or die "$0: bed2avgwingin(DIP) " . ($? >> 8);
-  qx(bed2avgwinbin.sh $mfn $cfn "$win" ${e}_MRE) == 0 or die "$0: bed2avgwingin(MRE) " . ($? >> 8);
+  print qx(bed2avgwinbin.sh $dfn $cfn "$win" ${e}_DIP) and $? and die "$0: bed2avgwingin(DIP) ".($? >> 8);
+  print qx(bed2avgwinbin.sh $mfn $cfn "$win" ${e}_MRE) and $? and die "$0: bed2avgwingin(MRE) ".($? >> 8);
 
   qx(for i in $win; do for a in DIP MRE; do wc ${e}_\${a}_d\${i}.cnt; done;done >&2);
 
   my $dip = join " ", map{"<\(cut -f2 ${e}_DIP_d${_}.cnt)"} (split /\W/,$win);
   my $mre = join " ", map{"<\(cut -f2 ${e}_MRE_d${_}.cnt)"} (split /\W/,$win);
   my $out = "${e}_DIPMRE.cnt"; 
-  system("bash","-c", "paste $dip $mre > $out") == 0 or die "$0: gen_avgwin(paste) " . ($? >> 8);
+  system("bash","-c", "paste $dip $mre >$out 2>&1 ") and $? and die "$0: gen_avgwin(paste) ".($? >> 8);
 
-  qx((echo $out "column number";awk '{print NF}' $out |sort -u) >&2);
+  qx((echo $out "column numbers";awk '{print NF}' $out |sort -u) >&2);
   # del cnt files??
 }
 
 sub make_fragfn {
   my ($dir,$cpg,$outfn) = @_;
-  qx(dir2frag.sh $dir $cpg > $outfn) == 0 or die "$0: medip_norm " . ($? >> 8);
+  qx(dir2frag.sh $dir $cpg >$outfn ) and $? and die "$0: medip_norm ".($? >> 8);
   qx(ls -l $outfn >&2;)
 }
 sub predict {
   my ($bin, $tfn,$crf,$mdldir,$e) = @_;
   for (0..$#$tfn) {
     my $mdl="$mdldir/$crf->[$_].mdl";
-    my $out="$tfn->[$_].out";
+    my $mname=qx(basename $mdldir);chomp $mname;
+    my $out="$tfn->[$_]_$mname.out";
     print STDERR "predict: [$crf->[$_]] [$mdl]\n";
-   # print qq($bin -t $mdl $tfn->[$_]);exit;
-    qx($bin -t $mdl $tfn->[$_]  |awk '(NF){print \$NF}' >$out) == 0 or die "$0: crfsgd " . ($? >> 8);
+    qx( ($bin -t $mdl $tfn->[$_] |awk '(NF){print \$NF}') >$out ) and $? and die "$0: crfsgd ".($? >> 8);
 
     qx(ls -l $out >&2);
 }
@@ -244,7 +252,8 @@ sub combine {
 
 # prediction fh's
   my @pred= map { 
-    IO::File::AutoChomp->new("${_}.out", 'r') or die "can't open $_.out: $!";
+    my $mname=qx(basename $mdldir);chomp $mname;
+    IO::File::AutoChomp->new("${_}_$mname.out", 'r') or die "can't open ${_}_$mname.out: $!";
     } @$tblfn;
 
     while (my @l = split /\t/, <$CPG>) {
@@ -255,14 +264,11 @@ sub combine {
           if (defined (my $p = $pred[$cidx]->getline() )){
               $v += $midmap->[$cidx]{ $p+0 };$c++;
             } else {die "$tblfn->[$cidx] has no val  for $l[3]!"}
-#          my $s =  $pred[$cidx]->getline() +0 ;$c++; my $m =$midmap->[$cidx]{$s}; $v+=$m;
-            #print "$tblfn->[$cidx] $s ($m) tot: $v\n" if $l[3] eq 'chr1.1388';
           }
         }
       die "@l has no predictions!" if !$c;
       $l[4] = $v/$c;
       print join("\t",@l),"\n";
-   #  exit if $l[3] eq 'chr1.1388';
     }
  
 # sanity check all pred's are eof 
@@ -271,8 +277,7 @@ sub combine {
 
 
 sub binon {
-  my ($cut,$v, $nobin) = @_;
-#  if ($v eq $nobin) {return $v};
+  my ($cut,$v) = @_;
   #NOTE: v can be < cut[0] if binning was done on small samples
   my $idx=1; while ($idx <= $#$cut && $v >= $cut->[$idx]) {$idx++}
   return  $cut->[$idx-1];
@@ -283,7 +288,7 @@ sub midpt_map{
   my ($crf, $cut, $max) = @_;
   my @rtn;
   for my $cidx (0..$#$crf) {
-    my $k=$crf->[$cidx]."__H1ES_BS";
+    my $k=$crf->[$cidx]."__BS";
     for ( 0 .. $#{$cut->{$k}}-1 ) {
       my $v = $cut->{$k}[$_]; 
       $rtn[$cidx]{$v} = ( $v + $cut->{$k}[$_+1] )/2;
@@ -304,17 +309,12 @@ sub make_crf {
   my ($pchr,$plocn);
   while (my @cpg = split /\t/, <$CPG>) {
     $c++;
-    # MRE and MeDIP cols
-    #my @mre = map{ ( split /\t/, readline($efn->{'MRE'}[$_]) )[1]+0 } (0..$#windist); #force numerical contxt
-    #my @dip = map{ (split /\t/, $efn->{'DIP'}[$_]->getline())[1] } (0..$#windist);
-    #my $frag = (split /\t/, $FRAG->getline())[1];
 
     my $dipmre = $EFN->getline();
     my $frag   = $FRAG->getline();
     my $gdat   = $GDAT->getline();
 
     # print this cpg or not?
-    #if (!(split /\t/,$CLASS->getline())[1]) {next}
     my @cls = (split /\t/,$CLASS->getline());
     if ($cls[0] ne $cpg[3]) {die "cls cpg != cpg ".join(" ", @cpg)."  ".join(" ", @cls)}
     if (!$cls[1]){next}
@@ -332,8 +332,6 @@ sub make_crf {
     $OUT->print( (split /\t/, $frag)[1], "\t");
 
     # all other cols (no autochomp) 
-    #$gdat =~ s/.*?\t//; #(cut off chrx.x)
-    #$OUT->print($gdat);
     my @gdat = split /\t/,$gdat;
     $OUT->print( ($gdat[$_]==-1 ? -1 : binon( $cut->{ "${crfnm}__$gdat_hdr->[$_]" },$gdat[$_] )),"\t" ) for (1..$#$gdat_hdr-1);
     $OUT->print( ($gdat[-1]==-1 ? -1 : binon( $cut->{ "${crfnm}__$gdat_hdr->[-1]" },$gdat[-1] )),"\n" );
@@ -344,37 +342,4 @@ sub make_crf {
   $OUT->say("");
 }
 
-
-
-
-
-## once through crf's
-#if ($startfrom < 3) {
-#
-#  # get filehandles
-## DIP/MRE
-#  my $EFN  = IO::File::AutoChomp->new("${eid}_DIPMRE.cnt", 'r') or die "can't open DIPMRE.cnt $_: $!";
-#  my $FRAG = IO::File::AutoChomp->new($fragfn,'r') or die "can't open $fragfn: $!";
-#  my $GDAT = IO::File::AutoChomp->new($gdatfn,'r') or die "can't open $gdatfn: $!";
-#
-#  # each crf
-#  for my $cidx (0..$#crf) {
-#    print STDERR "make $crf[$cidx] table\n"; 
-#
-#    # reset global fh's
-#    #for my $k (keys %efn) { $_->seek(0,0) for @{$efn{$k}}; }
-#    $CPG->seek(0,0);
-#    $EFN->seek(0,0);  
-#    $FRAG->seek(0,0);
-#    $GDAT->seek(0,0);my @gdat_hdr = split /\t/,$GDAT->getline();
-# 
-#    # get crf-specific fh's (these should close as they go out of scope)
-#    my $CLASS    = $CLS[$cidx];
-#    my $OUT      = IO::File->new($tblfn[$cidx], 'w') or die "can't open $_: $!";
-#
-#    make_crf($CPG,$CLASS,$gapsz,$crf[$cidx],\@windist,\%cut,$EFN,$FRAG,$GDAT,\@gdat_hdr,$OUT);
-#    $OUT->close();
-# exit;
-#  }
-#}
 
