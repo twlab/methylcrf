@@ -30,7 +30,7 @@ olapBed:
 	ln -s src/olapBed/olapBed ./
 
 clean:
-	rm methylCRF.pl MRE_norm.sh sam2bed.pl medip_norm.sh crfsgd bed2avgwinbin.sh dir2frag.sh olapBed 2>/dev/null
+	-rm methylCRF.pl MRE_norm.pl sam2bed.pl medip_norm.sh crfsgd bed2avgwinbin.sh dir2frag.sh olapBed 2>/dev/null
 	cd src/sgd; make clean; cd ../../;
 	cd src/olapBed; make clean; cd ../
 
