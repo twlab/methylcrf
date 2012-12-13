@@ -70,6 +70,15 @@ typedef vector<int> ints_t;
 
 bool verbose = true;
 
+ //ms
+#include <sstream>
+template<class T>
+T fromString(const std::string& s) {
+  std::istringstream stream(s);
+  T t;
+  stream >> t;
+  return t;
+}
 
 // ============================================================
 // Utilities
@@ -81,7 +90,8 @@ skipBlank(istream &f)
   int c = f.get();
   while (f.good() && isspace(c) && c!='\n' && c!='\r')
     c = f.get();
-  f.unget();  
+  if (! f.eof())
+    f.unget();  
   return c;
 }
 
@@ -92,7 +102,8 @@ skipSpace(istream &f)
   int c = f.get();
   while (f.good() && isspace(c))
     c = f.get();
-  f.unget();  
+  if (! f.eof())
+    f.unget();  
   return c;
 }
 
@@ -964,6 +975,7 @@ public:
   
   double viterbi(ints_t &path);
   int test();
+  int test_concordance(); //ms
   int test(ostream &f);
   double scoreCorrect();
   double gradCorrect(double g);
@@ -1092,6 +1104,24 @@ Scorer::test()
   for (int pos=0; pos<npos; pos++)
     if (path[pos] != s.y(pos))
       errors += 1;
+  return errors;
+}
+
+int
+Scorer::test_concordance() {
+  ints_t path;
+  int npos = s.size();
+  int errors = 0;
+  viterbi(path);
+
+  for (int pos=0; pos<npos; pos++) {
+    int myy = s.y(pos);
+    if (myy >= 0) {
+      float bs   = fromString<float>(d.outputString(myy));    
+      float mcrf = fromString<float>(d.outputString(path[pos]));    
+      if ( bs >= 0 && std::abs(bs-mcrf) > 0.25) errors += 1;
+    }
+  }
   return errors;
 }
 
@@ -1502,7 +1532,8 @@ public:
 
   void train(const dataset_t &data, int epochs=1, Timer *tm=0);
 
-  void test(const dataset_t &data, const char *conlleval=0, Timer *tm=0);
+  void test(const dataset_t &data, const char *conlleval=0, Timer *tm=0); 
+  double test_concordance(const dataset_t &data); //ms
   void testna(const dataset_t &data, const char *conlleval=0, Timer *tm=0);
   
   friend istream& operator>> ( istream &f, CrfSgd &d );
@@ -1821,7 +1852,7 @@ CrfSgd::train(const dataset_t &data, int epochs, Timer *tm)
 }
 
 
-void
+void 
 CrfSgd::test(const dataset_t &data, const char *conlleval, Timer *tm)
 {
    if (dict.nOutputs() <= 0)
@@ -1865,6 +1896,33 @@ CrfSgd::test(const dataset_t &data, const char *conlleval, Timer *tm)
      cout << " time=" << tm->elapsed() << "s.";
    if (verbose)
      cout << endl;
+
+}
+
+double //ms: return errors
+CrfSgd::test_concordance(const dataset_t &data) {
+  if (dict.nOutputs() <= 0) {
+    cerr << "ERROR (test): Must call load() or initialize() before test()." << endl;
+    exit(10);
+  }
+  int errors = 0;
+  int total = 0;
+  for (unsigned int i=0; i<data.size(); i++) {
+    AScorer scorer(data[i], dict, ww);
+    errors += scorer.test_concordance();
+    // gotta get -1's
+    int neg =0;
+    for (int pos=0; pos<data[i].size(); pos++) {
+      int myy = data[i].y(pos);
+      if (myy == -1) neg += 1;
+    }
+    total += data[i].size() - neg;
+  }
+
+  double misrate = (double)(errors*100)/(total ? total : 1);
+  misrate = ((int)(misrate*100))/100.0;
+
+  return misrate; //ms
 }
 
 
@@ -2017,7 +2075,8 @@ parseCmdLine(int argc, char **argv)
           else if (s[0] == 'f')
             {
               cutoff = atoi(argv[i]);
-              if (cutoff <= 0 || cutoff > 1000)
+              //ms: if (cutoff <= 0 || cutoff > 1000)
+              if (cutoff <= 0 )
                 {
                   cerr << "ERROR: " 
                        << "Illegal cutoff value: " << cutoff << endl;
@@ -2105,6 +2164,7 @@ main(int argc, char **argv)
   parseCmdLine(argc, argv);
   // initialize crf
   CrfSgd crf;
+  double  minErrors = 10000000; //ms
   if (tag) 
     {
       igzstream f(modelFile.c_str()); 
@@ -2141,10 +2201,21 @@ main(int argc, char **argv)
               cout << "Training perf:";
               crf.test(train, conlleval);
             }
-          if (verbose && test.size())
+         if (verbose && test.size()) //ms: don't do both
             {
-              cout << "Testing perf:";
-              crf.test(test, conlleval);
+              cout << "Testing perf: ";
+              //ms
+              double cerrRate = crf.test_concordance(test);
+              cout<<cerrRate<<" "<<minErrors<<endl;
+              // if test is close prefer improvements in train
+              // cause test was minimizing early
+              if (cerrRate <= minErrors + 0.175) { 
+                string nErrMdl(modelFile); nErrMdl += ".nmdl";
+                cout << "Saving model file " << nErrMdl << "." << endl;
+                ogzstream f(nErrMdl.c_str()); 
+                f<<crf;
+              if (cerrRate <= minErrors) minErrors=cerrRate;
+              }
             }
         }
       if (verbose)

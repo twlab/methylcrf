@@ -81,7 +81,8 @@ skipBlank(istream &f)
   int c = f.get();
   while (f.good() && isspace(c) && c!='\n' && c!='\r')
     c = f.get();
-  f.unget();  
+  if (! f.eof())
+    f.unget();  
   return c;
 }
 
@@ -92,9 +93,8 @@ skipSpace(istream &f)
   int c = f.get();
   while (f.good() && isspace(c))
     c = f.get();
-  //ms
-  //f.unget();  
-  if (!f.eof()) f.unget();  
+  if (! f.eof())
+    f.unget();  
   return c;
 }
 
