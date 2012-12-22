@@ -20,7 +20,7 @@
 use strict;
 use autodie;
 use List::Util qw(sum reduce);our ($a, $b); 
-use List::MoreUtils;
+use List::MoreUtils qw(uniq);
 
 my $usage = '
 MRE_handler.pl <expr bed file or - > <virtual digest file> <prefix for additional output files>
