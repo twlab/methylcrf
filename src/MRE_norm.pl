@@ -145,7 +145,7 @@ sub filter_reads_by_mre_sites {
   open ( IN, $in_f );
   open ( OUT, ">$out_f" );
 
-  my @fnnm = ('Uknown'); push @fnnm, (keys %$PE) if ($printidx);
+  my @fnnm = ('Unknown'); push @fnnm, (keys %$PE) if ($printidx);
 
   my %fh = map {
     my $fn=$name."_".$_."_fullindex.txt";
