@@ -27,7 +27,7 @@ use strict;
 #        --maybe switch to filehandle --it's on the system, so maybe it's std
 package IO::File::AutoChomp;
 use base 'IO::File';
-sub getline  { my $v = readline($_[0]) || die "readline failed: [$_[0]] $!";chomp $v;return $v}
+sub getline  { my $v = readline($_[0]) || die "readline failed: [$_[0]] ($!)";chomp $v;return $v}
 sub getlines { my ($self) = @_; return map { chomp; $_ } $self->SUPER::getlines(); }
 
 
@@ -75,10 +75,14 @@ if ($startfrom <=0 && $goto >= 0) {
 }
 
 ## 1: generate windowed files ({e}_DIP_d{d}.cnt, {e}_MRE_d{d}.cnt)
+my $win="0 10 100 1000 10000";
 if ($startfrom <=1 && $goto >= 1) {
   print STDERR scalar localtime(), " make avg windows for $dipfn and $mrefn\n";
-  # makes e_DIPMRE.cnt
-  gen_avgwindows($eid,"$dipfn.norm.bed",$mrefn,$cpgfn, "0 10 100 1000 10000") ;
+  gen_avgwindows($eid,"$dipfn.norm.bed",$mrefn,$cpgfn,$win ) ;
+}
+if ($startfrom <=1.5 && $goto >= 1.5) {
+  print STDERR scalar localtime(), " making DIPMRE.cnt for $dipfn and $mrefn\n";
+  make_DIPMRE_cnt($eid, $win) ;
 }
 
 ## 2: make MRE frag file
@@ -130,17 +134,30 @@ if ($startfrom <=3 && $goto>=3) {
   my @OUT = map { IO::File->new($_, 'w') or die "can't open $_: $!"; } @tblfn ;
 
   my (@pchr,@plocn);
+  # assume CPG is a subset of EFN,FRAG,GDAT and all ftr_cpg.bins (cpgid [0,1]), 
+  #     but that cid orders are consistent
   while (my @cpg = split /\t/, <$CPG>) {
+    my $cid= $cpg[3];
 
-    my @dipmre = (split /\t/,  $EFN->getline());chomp $dipmre[-1];
-    my $frag   = (split /\t/, $FRAG->getline())[1];
-    my @gdat   = (split /\t/, $GDAT->getline()); chomp @gdat[-1];
+    my (@dipmre,@frag,@gdat);
+    while (1) {
+      @dipmre = (split /\t/,  $EFN->getline());chomp $dipmre[-1];
+     # $frag   = (split /\t/, $FRAG->getline())[1];
+      @frag   = (split /\t/, $FRAG->getline());chomp $frag[-1];
+      @gdat   = (split /\t/, $GDAT->getline()); chomp $gdat[-1];
+      die "at cpg:$cid ($dipmre[0] != $frag[0] != $gdat[0])" if grep {$_ ne $dipmre[0]} ($frag[0],$gdat[0]);
+      last if $dipmre[0] eq $cid;
+    }
 
     # each crf
     for my $cidx (0..$#crf) {
       # print this cpg or not?
-      my @cls = split /\t/, $CLS[$cidx]->getline();
-      if ($cls[0] ne $cpg[3]) {die "cls cpg != cpg ".join(" ", @cpg)."  ".join(" ", @cls)}
+      my @cls;
+      while (1) {
+        @cls = split /\t/, $CLS[$cidx]->getline();
+        last if ($cls[0] eq $cid);
+      }
+      #if ($cls[0] ne $cid) {die "cls cpg != cpg ".join(" ", @cpg)."  ".join(" ", @cls)}
       if (!$cls[1]) {next}
 
       # this crf's fh 
@@ -152,12 +169,12 @@ if ($startfrom <=3 && $goto>=3) {
       {$OUT->say("");}
 
       # MRE and MeDIP cols
-      $OUT->print( ($dipmre[$_]           ==-1 ? -1 : binon( $cut{ "${crfnm}__DIP_d$windist[$_]" },$dipmre[$_]          )),"\t" ) for (0..$#windist);
-      $OUT->print( ($dipmre[ $_+@windist ]==-1 ? -1 : binon( $cut{ "${crfnm}__MRE_d$windist[$_]" },$dipmre[$_+@windist] )),"\t" ) for (0..$#windist);
+      $OUT->print( ($dipmre[$_]           ==-1 ? -1 : binon( $cut{ "${crfnm}__DIP_d$windist[$_]" },$dipmre[1+$_]          )),"\t" ) for (0..$#windist);
+      $OUT->print( ($dipmre[ $_+@windist ]==-1 ? -1 : binon( $cut{ "${crfnm}__MRE_d$windist[$_]" },$dipmre[1+$_+@windist] )),"\t" ) for (0..$#windist);
 
       # mre frag 
-      die "no frag at cpg $cpg[3]" unless defined $frag;
-      $OUT->print( $frag, "\t");
+      #die "no frag at cpg $cpg[3]" unless defined $frag[1];
+      $OUT->print( $frag[1], "\t");
 
       # all other cols (no autochomp) 
       $OUT->print( ($gdat[$_]==-1 ? -1 : binon( $cut{ "${crfnm}__$gdat_hdr[$_]" },$gdat[$_] )),"\t" ) for (1..$#gdat_hdr-1);
@@ -221,10 +238,24 @@ sub gen_avgwindows {
 
   qx(for i in $win; do for a in DIP MRE; do wc ${e}_\${a}_d\${i}.cnt; done;done >&2);
 
+  my $id = join " ", map{"<\(cut -f1 ${e}_DIP_d${_}.cnt)"} (split /\W/,$win)[0];
   my $dip = join " ", map{"<\(cut -f2 ${e}_DIP_d${_}.cnt)"} (split /\W/,$win);
   my $mre = join " ", map{"<\(cut -f2 ${e}_MRE_d${_}.cnt)"} (split /\W/,$win);
   my $out = "${e}_DIPMRE.cnt"; 
-  system("bash","-c", "paste $dip $mre >$out 2>&1 ") and $? and die "$0: gen_avgwin(paste) ".($? >> 8);
+  system("bash","-c", "paste $id $dip $mre >$out 2>&1 ") and $? and die "$0: gen_avgwin(paste) ".($? >> 8);
+
+  qx((echo $out "column numbers";awk '{print NF}' $out |sort -u) >&2);
+  # del cnt files??
+}
+sub make_DIPMRE_cnt {
+  my ($e,$win) = @_;
+
+  my @win = (split /\W/,$win);
+  my $id  = join " ", map{"<\(cut -f1 ${e}_DIP_d${_}.cnt)"} $win[0];
+  my $dip = join " ", map{"<\(cut -f2 ${e}_DIP_d${_}.cnt)"} @win;
+  my $mre = join " ", map{"<\(cut -f2 ${e}_MRE_d${_}.cnt)"} @win;
+  my $out = "${e}_DIPMRE.cnt"; 
+  system("bash","-c", "paste $id $dip $mre >$out 2>&1 ") and $? and die "$0: DIPMRE(paste) ".($? >> 8);
 
   qx((echo $out "column numbers";awk '{print NF}' $out |sort -u) >&2);
   # del cnt files??
@@ -252,25 +283,33 @@ sub combine {
 
 # prediction fh's
   my @pred= map { 
-    my $mname=qx(basename $mdldir);chomp $mname;
-    IO::File::AutoChomp->new("${_}_$mname.out", 'r') or die "can't open ${_}_$mname.out: $!";
-    } @$tblfn;
+  my $mname=qx(basename $mdldir);chomp $mname;
+  IO::File::AutoChomp->new("${_}_$mname.out", 'r') or die "can't open ${_}_$mname.out: $!";
+  } @$tblfn;
 
-    while (my @l = split /\t/, <$CPG>) {
-      $#l=4; # remove anything after score
-      my ($v,$c);
-      for my $cidx (0..$#$tblfn) {
-        if ( (split /\t/, $CLS->[$cidx]->getline())[1] ) {
-          if (defined (my $p = $pred[$cidx]->getline() )){
-              $v += $midmap->[$cidx]{ $p+0 };$c++;
-            } else {die "$tblfn->[$cidx] has no val  for $l[3]!"}
-          }
-        }
-      die "@l has no predictions!" if !$c;
-      $l[4] = $v/$c;
-      print join("\t",@l),"\n";
+  # assume cpg.bin is a subset of all ftr_cpg.bin  (cpgid [0,1]) and all cid orders are consistent
+  while (my @l = split /\t/, <$CPG>) {
+    my $cid=$l[3];
+    $#l=4; # remove anything after score
+
+    my ($v,$c);
+    for my $cidx (0..$#$tblfn) {
+      my @cls;
+      while (1) {
+        @cls = split /\t/, $CLS[$cidx]->getline();
+        last if ($cls[0] eq $cid);
+      }
+      if (!$cls[1]) {next};
+
+      if (defined (my $p = $pred[$cidx]->getline() )){
+        $v += $midmap->[$cidx]{ $p+0 };$c++;
+      } else {die "$tblfn->[$cidx] has no val for $cid!"}
     }
- 
+    die "@l has no predictions!" if !$c;
+    $l[4] = sprintf "%.2f", $v/$c;
+    print join("\t",@l),"\n";
+  }
+
 # sanity check all pred's are eof 
   for (@$CLS) { die "$_ not finished" if !$_->eof()}
 }
