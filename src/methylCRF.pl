@@ -145,7 +145,7 @@ if ($startfrom <=3 && $goto>=3) {
      # $frag   = (split /\t/, $FRAG->getline())[1];
       @frag   = (split /\t/, $FRAG->getline());chomp $frag[-1];
       @gdat   = (split /\t/, $GDAT->getline()); chomp $gdat[-1];
-      die "at cpg:$cid ($dipmre[0] != $frag[0] != $gdat[0])" if grep {$_ ne $dipmre[0]} ($frag[0],$gdat[0]);
+      die "at cpg: $cid ($dipmre[0] != $frag[0] != $gdat[0])" if grep {$_ ne $dipmre[0]} ($frag[0],$gdat[0]);
       last if $dipmre[0] eq $cid;
     }
 
@@ -272,8 +272,9 @@ sub predict {
     my $mdl="$mdldir/$crf->[$_].mdl";
     my $mname=qx(basename $mdldir);chomp $mname;
     my $out="$tfn->[$_]_$mname.out";
+    qx(stat $mdl $tfn->[$_]) and $? and die "$0:  ".($? >> 8); 
     print STDERR "predict: [$crf->[$_]] [$mdl]\n";
-    qx( ($bin -t $mdl $tfn->[$_] |awk '(NF){print \$NF}') >$out ) and $? and die "$0: crfsgd ".($? >> 8);
+    qx( ($bin -t $mdl $tfn->[$_] |awk '(NF){print \$NF}') >$out ) and $? and die "$0: qx(($bin -t $mdl $tfn->[$_] |awk '(NF){print \$NF}')>$out) ".($? >> 8);
 
     qx(ls -l $out >&2);
 }
