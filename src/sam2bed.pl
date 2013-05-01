@@ -38,6 +38,10 @@ BEGIN{
   # -c <number of bases to remove from begining of read>
   # -r  # report stats to stderr
   # -q <min mapq valu to accept>
+  # -chr  regex that sequence name must match: 
+  #         default: chr   
+  #         multiple match example:  chr|Zv9
+         
 }
 
 ## find call
@@ -66,10 +70,11 @@ $hqreads++;
 # MRE_handler sam_2_bed check chr name and whether there >= 10 fields instead
 if ((2**2)&$F[1]) { $unmapped{"$F[1] $F[2]"}++ if ($a{-r});next }
 
+my $re = $a{-chr} ? $a{-chr} : "chr";
 my $chr = $F[2];
-if ($chr =~ m/^(\d+|[XYM]|MT)$/) { $chr ="chr$chr"}
-elsif ($chr =~ /^GL\d+/)         { $contigcnt++; next}           # dont know what else to do
-elsif ($chr !~ /^chr/)           { warn "whatchrom:$_ \n"; next} # dont know what else to do
+if ($chr =~ m/^(\d+|[XYM]|MT)$/) { $chr ="chr$chr"}              # add chr to some misnamed sequences
+elsif ($chr =~ /^GL\d+/)         { $contigcnt++; next}           # skip these (dont know what else to do)
+elsif ($chr !~ /^($chr)/)           { warn "whatchrom:$_ \n"; next} # dont know what else to do
 
 #match legacy
 $chr =~ s/chrMT/chrM/;

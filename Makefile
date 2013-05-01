@@ -3,7 +3,7 @@
 
 all: methylCRF.pl
 
-methylCRF.pl: MRE_norm.pl medip_norm.sh crfasgd bed2avgwinbin.sh dir2frag.sh
+methylCRF.pl: MRE_norm.pl medip_norm.sh crfasgd bed2avgwinbin.sh dir2frag.sh sam2bed.pl
 	ln -s src/methylCRF.pl ./
 
 MRE_norm.pl:
