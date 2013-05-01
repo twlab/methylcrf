@@ -169,8 +169,8 @@ if ($startfrom <=3 && $goto>=3) {
       {$OUT->say("");}
 
       # MRE and MeDIP cols
-      $OUT->print( ($dipmre[$_]           ==-1 ? -1 : binon( $cut{ "${crfnm}__DIP_d$windist[$_]" },$dipmre[1+$_]          )),"\t" ) for (0..$#windist);
-      $OUT->print( ($dipmre[ $_+@windist ]==-1 ? -1 : binon( $cut{ "${crfnm}__MRE_d$windist[$_]" },$dipmre[1+$_+@windist] )),"\t" ) for (0..$#windist);
+      $OUT->print( ($dipmre[$_+1]           ==-1 ? -1 : binon( $cut{ "${crfnm}__DIP_d$windist[$_]" },$dipmre[1+$_]          )),"\t" ) for (0..$#windist);
+      $OUT->print( ($dipmre[ $_+1+@windist ]==-1 ? -1 : binon( $cut{ "${crfnm}__MRE_d$windist[$_]" },$dipmre[1+$_+@windist] )),"\t" ) for (0..$#windist);
 
       # mre frag 
       #die "no frag at cpg $cpg[3]" unless defined $frag[1];
