@@ -74,7 +74,7 @@ my $re = $a{-chr} ? $a{-chr} : "chr";
 my $chr = $F[2];
 if ($chr =~ m/^(\d+|[XYM]|MT)$/) { $chr ="chr$chr"}              # add chr to some misnamed sequences
 elsif ($chr =~ /^GL\d+/)         { $contigcnt++; next}           # skip these (dont know what else to do)
-elsif ($chr !~ /^($chr)/)           { warn "whatchrom:$_ \n"; next} # dont know what else to do
+elsif ($chr !~ /^($chr)/)        { warn "whatchrom:$_ \n"; next} # dont know what else to do
 
 #match legacy
 $chr =~ s/chrMT/chrM/;
@@ -82,7 +82,7 @@ $chr =~ s/chrMT/chrM/;
 my $strand=(2**4)&$F[1]? "-":"+";
 
 my ($bgn,$end);
-if ($strand eq '-') {
+if ($strand eq '+') {
   $bgn = $F[3] -$a{-c}; 
   $end = $F[3] +length($F[9]) -1; 
 } else {
