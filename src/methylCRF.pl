@@ -18,6 +18,9 @@
 #------------------------------------------------------------------------#
 
 use strict;
+ use FindBin qw($Bin);
+FindBin::again(); 
+
 # NOTES #
 # should have used BS midpt for training too, so I could avoid caring here
 #########
@@ -34,7 +37,12 @@ sub getlines { my ($self) = @_; return map { chomp; $_ } $self->SUPER::getlines(
 
 package main;
 
-my $bin     = "./crfasgd";
+# uts
+my $crfbin     = "$Bin/crfasgd";
+my $medip_norm = "$Bin/medip_norm.sh";
+my $bed2bin    = "$Bin/bed2avgwinbin.sh";
+my $dir2frag   = "$Bin/dir2frag.sh";
+
 my @windist = (0,10,100,1000,10000);
 my (
   $mdldir,  # has one model file per crf
@@ -193,7 +201,7 @@ if ($startfrom <=3 && $goto>=3) {
 ## 3: Predict ##
 if ($startfrom <= 4 && $goto>=4) {
   print STDERR scalar localtime(), " predict\n";
-  predict($bin,\@tblfn,\@crf,$mdldir, $eid) 
+  predict($crfbin,\@tblfn,\@crf,$mdldir, $eid) 
 }
   
 
@@ -226,15 +234,15 @@ if ($startfrom == 6) {
 sub format_DIPMRE {
   my ($dfn,$mfn,$cfn) = @_;
 # do medip norm
-  qx(medip_norm.sh $dfn $cfn >$dfn.norm.bed ) and $? and die "$0: medip_norm ".($? >> 8);
+  qx($medip_norm $dfn $cfn >$dfn.norm.bed ) and $? and die "$0: medip_norm ".($? >> 8);
 
  qx(ls -l $dfn $mfn $dfn.norm.bed >&2);
 }
 
 sub gen_avgwindows {
   my ($e,$dfn,$mfn,$cfn,$win) = @_;
-  print qx(bed2avgwinbin.sh $dfn $cfn "$win" ${e}_DIP) and $? and die "$0: bed2avgwingin(DIP) ".($? >> 8);
-  print qx(bed2avgwinbin.sh $mfn $cfn "$win" ${e}_MRE) and $? and die "$0: bed2avgwingin(MRE) ".($? >> 8);
+  print qx($bed2bin $dfn $cfn "$win" ${e}_DIP) and $? and die "$0: bed2avgwingin(DIP) ".($? >> 8);
+  print qx($bed2bin $mfn $cfn "$win" ${e}_MRE) and $? and die "$0: bed2avgwingin(MRE) ".($? >> 8);
 
   qx(for i in $win; do for a in DIP MRE; do wc ${e}_\${a}_d\${i}.cnt; done;done >&2);
 
@@ -263,7 +271,7 @@ sub make_DIPMRE_cnt {
 
 sub make_fragfn {
   my ($dir,$cpg,$outfn) = @_;
-  qx(dir2frag.sh $dir $cpg >$outfn ) and $? and die "$0: medip_norm ".($? >> 8);
+  qx($dir2frag $dir $cpg >$outfn ) and $? and die "$0: medip_norm ".($? >> 8);
   qx(ls -l $outfn >&2;)
 }
 sub predict {
