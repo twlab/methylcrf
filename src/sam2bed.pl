@@ -35,7 +35,7 @@ BEGIN{
     if ($a eq '-r') {$a{$a}=1          }
     else            {$a{$a}=shift @ARGV} 
   }
-  # -c <number of bases to remove from begining of read>
+  # -c <number of bases was removed from begining of read>
   # -r  # report stats to stderr
   # -q <min mapq valu to accept>
   # -chr  regex that sequence name must match: 
@@ -74,7 +74,7 @@ my $re = $a{-chr} ? $a{-chr} : "chr";
 my $chr = $F[2];
 if ($chr =~ m/^(\d+|[XYM]|MT)$/) { $chr ="chr$chr"}              # add chr to some misnamed sequences
 elsif ($chr =~ /^GL\d+/)         { $contigcnt++; next}           # skip these (dont know what else to do)
-elsif ($chr !~ /^($chr)/)        { warn "whatchrom:$_ \n"; next} # dont know what else to do
+elsif ($chr !~ /^($re)/)         { warn "whatchrom:$_ \n"; next} # dont know what else to do
 
 #match legacy
 $chr =~ s/chrMT/chrM/;
