@@ -21,12 +21,18 @@ use strict;
 use autodie;
 use List::Util qw(sum reduce);our ($a, $b); 
 use List::MoreUtils qw(uniq);
+use Data::Dumper;
 
 my $usage = '
-MRE_handler.pl <expr bed file or - > <virtual digest file> <prefix for additional output files>
+MRE_handler.pl [options] <expr bed file or - > <virtual digest file> <prefix for additional output files>
 
+[options]
+ -vdat             : virtial digest file is a dumped struct (ie, not a bed file)
+ -vdump            : process virtual digest file and dump to stdout
 expr bed file      : should have the call issue already fixed
-virtual digest file: file of all the virtual enzyme fragments combined. should include the whole recognition site on both sides. [should change this to include just the cut fragment].  and have the enzyme name as the id
+virtual digest file: file of all the virtual enzyme fragments combined. should include the whole 
+                     recognition site on both sides. [should change this to include just the cut 
+                     fragment].  and have the enzyme name as the id
 
 
 MRE script, does the following:
@@ -49,10 +55,21 @@ NOTE: BStUI gives information about 2 CpGs.  These are both counted.  CGCG and G
 
 ';
 
-die $usage unless (@ARGV == 3 || @ARGV==4);
+
+my $vdat;
+while ($ARGV[0] =~ /(-[^ ])/) {
+  my $arg = shift @ARGV;
+  if ($arg eq '-vdat') {
+    $vdat="load"
+  } elsif ($arg eq '-vdump') {
+    $vdat="dump";
+  }
+}
+
+die $usage unless (@ARGV > 2);
 my ( $exp_f, $vdigest, $name, $printidx) = @ARGV;
 
-# enzyme cut sites
+# enzyme cut sit2s
 #my %enz =( 'CCGG',1, 'GCGG',1, 'GCGC',1, 'ACGT',1, 'CGCG',2,);
 my $total;
 my $unique;
@@ -75,7 +92,21 @@ my (%cnt,%CpG,%reads);
 
 
 warn "build_PE_hash\n";
-my ($PE,$enzcnt) =build_PE_hash($vdigest);
+my ($PE,$enzcnt);
+if ($vdat eq 'load') {
+  my $VAR1 = do { 
+    no strict 'vars';
+    eval qx(cat $vdigest);
+  };
+ ($PE,$enzcnt) = @$VAR1;
+1;
+} else {
+  ($PE,$enzcnt) =build_PE_hash($vdigest);
+  if ($vdat eq 'dump') {
+  print Dumper([$PE,$enzcnt]);
+  exit;
+  }
+}
 
 warn "filter reads by mre sites\n";
 # readin bed, write xxx_full.index.bed, gens CGCG_CpG;
@@ -98,8 +129,6 @@ sub build_PE_hash {
     @line   = split /\t/;
     my $enz = uc($line[3]); $enz = 'GCGG' if ($enz eq 'CCGC');
     $enzcnt{$enz}++;
-
-    #if (!exists $enz{$enz}) {die "Enzyme $enz not defined!!"}
 
     $site    = join "|",$line[0],$line[1],"+";
     $pe_site = join "|",$line[0],$line[2],"-"; # 0-base it?
@@ -164,8 +193,9 @@ sub filter_reads_by_mre_sites {
     } elsif ( $line[5] eq "-" ) {
       $site = $line[0].'|'.$line[2].'|-';
       $CpG  = $line[0].'|'.($line[2]-2); # converts to 0-based at bgn of CG
-    } else { die "dont know strand $line[5]"}
+    } else { die "dont know strand [$line[5]] line:$.  [$_]"}
 
+   chomp; print join("\t",$_,$site,$CpG),"\n";
     my $line = join("\t", @line[0..3,5])."\n";
 
     my @cuts = grep { exists $PE->{$_}{$site} } keys %$PE;
