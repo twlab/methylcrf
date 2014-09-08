@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 #------------------------------------------------------------------------#
 # Copyright 2012                                                         #
-# Author: stevens _at_ cse.wustl.edu (from Ting Wang original)           #
+# Author: stevens _at_ cse.wustl.edu                                     #
 #                                                                        #
 # This program is free software: you can redistribute it and/or modify   #
 # it under the terms of the GNU General Public License as published by   #
@@ -67,8 +67,11 @@ if (-d $fragdir) { $fragfn  = ${eid}."_".qx(basename $fragdir); chomp $fragfn; }
 # startfrom:
 # 0 all (format DIP/MRE bed files)
 # 1 DIP/MRE avgwin (25Gb)
+# 1.5 DIP/MRE count files
 # 2 make sampled MRE fragment file
 # 3 make tables  (1.5hr)
+# 3.1 make table for training: no binning or gaps
+#     mCRF.pl xxxxxx   0 3.1
 # 4 predict
 # 5 combine
 # 6 make dirs to put extra files in [have to give explicitely]
@@ -172,21 +175,38 @@ if ($startfrom <=3 && $goto>=3) {
       my $OUT   = $OUT[$cidx];
       my $crfnm = $crf[$cidx];
 
-      # add newline for gaps
-      if ( $pchr[$cidx] && ($pchr[$cidx] ne $cpg[0] || ($cpg[1] -$plocn[$cidx] >$gapsz)) ) 
-      {$OUT->say("");}
+      if ($goto == 3.1) {
+        ## tables for training: no gap or bin
+        # MRE and MeDIP cols
+        $OUT->print( $dipmre[$_+1],"\t" ) for (0..$#windist);
+        $OUT->print( $dipmre[ $_+1+@windist ],"\t" ) for (0..$#windist);
+  
+        # mre frag 
+        #die "no frag at cpg $cpg[3]" unless defined $frag[1];
+        $OUT->print( $frag[1], "\t");
+  
+        # all other cols (no autochomp) 
+        $OUT->print( $gdat[$_],"\t" ) for (1..$#gdat_hdr-1);
+        $OUT->print( $gdat[-1],"\n" );
 
-      # MRE and MeDIP cols
-      $OUT->print( ($dipmre[$_+1]           ==-1 ? -1 : binon( $cut{ "${crfnm}__DIP_d$windist[$_]" },$dipmre[1+$_]          )),"\t" ) for (0..$#windist);
-      $OUT->print( ($dipmre[ $_+1+@windist ]==-1 ? -1 : binon( $cut{ "${crfnm}__MRE_d$windist[$_]" },$dipmre[1+$_+@windist] )),"\t" ) for (0..$#windist);
-
-      # mre frag 
-      #die "no frag at cpg $cpg[3]" unless defined $frag[1];
-      $OUT->print( $frag[1], "\t");
-
-      # all other cols (no autochomp) 
-      $OUT->print( ($gdat[$_]==-1 ? -1 : binon( $cut{ "${crfnm}__$gdat_hdr[$_]" },$gdat[$_] )),"\t" ) for (1..$#gdat_hdr-1);
-      $OUT->print( ($gdat[-1]==-1 ? -1 : binon( $cut{ "${crfnm}__$gdat_hdr[-1]" },$gdat[-1] )),"\n" );
+      } else { 
+        ## tables for running mCRF
+        # add newline for gaps
+        if ( $pchr[$cidx] && ($pchr[$cidx] ne $cpg[0] || ($cpg[1] -$plocn[$cidx] >$gapsz)) ) 
+        {$OUT->say("");}
+  
+        # MRE and MeDIP cols
+        $OUT->print( ($dipmre[$_+1]           ==-1 ? -1 : binon( $cut{ "${crfnm}__DIP_d$windist[$_]" },$dipmre[1+$_]          )),"\t" ) for (0..$#windist);
+        $OUT->print( ($dipmre[ $_+1+@windist ]==-1 ? -1 : binon( $cut{ "${crfnm}__MRE_d$windist[$_]" },$dipmre[1+$_+@windist] )),"\t" ) for (0..$#windist);
+  
+        # mre frag 
+        #die "no frag at cpg $cpg[3]" unless defined $frag[1];
+        $OUT->print( $frag[1], "\t");
+  
+        # all other cols (no autochomp) 
+        $OUT->print( ($gdat[$_]==-1 ? -1 : binon( $cut{ "${crfnm}__$gdat_hdr[$_]" },$gdat[$_] )),"\t" ) for (1..$#gdat_hdr-1);
+        $OUT->print( ($gdat[-1]==-1 ? -1 : binon( $cut{ "${crfnm}__$gdat_hdr[-1]" },$gdat[-1] )),"\n" );
+      }
 
       ($pchr[$cidx],$plocn[$cidx]) = ($cpg[0],$cpg[2])
     }
@@ -349,7 +369,7 @@ sub midpt_map{
 # Not really sure the best way to do this:
 # 1) loop through crfs w/ cpg's inside
 # 2) loop through cpg w/ crf's inside
-sub make_crf {
+sub make_crf_old {
   my ($CPG,$CLASS,$gapsz,$crfnm,$windist,$cut,$EFN,$FRAG,$GDAT,$gdat_hdr,$OUT) = @_;
   # local $| = 1;
 
