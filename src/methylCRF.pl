@@ -36,7 +36,6 @@ sub getlines { my ($self) = @_; return map { chomp; $_ } $self->SUPER::getlines(
 
 
 package main;
-
 # uts
 my $crfbin     = "$Bin/crfasgd";
 my $medip_norm = "$Bin/medip_norm.sh";
@@ -44,25 +43,41 @@ my $bed2bin    = "$Bin/bed2avgwinbin.sh";
 my $dir2frag   = "$Bin/dir2frag.sh";
 
 my @windist = (0,10,100,1000,10000);
+
+# optional arguments
+my %c = (
+ -mdir  => 'mdl',  # model dir: has one model file per crf
+ -gdat  => 'gdat', # global species specific data: xxx_cpg.bin for each crf, cpg.bed, gdat.tbl
+ -gap   => '750',  # size of gap
+ -eid   => 'eid',  # prefix for output files
+ -sfrom => '0',    # start from step
+ -gto   => '5',    # don't go past this step
+ -fltr  => '',     # file to filter CpGs on
+);
+
+while ($ARGV[0] =~ /^-/) {
+   my $_ = shift @ARGV;
+   if (exists $c{$_}) {$c{$_}= shift @ARGV}
+   else {$c{$ARGV[0]}++ }
+}
+
+if (@ARGV != 3) { die "USAGE $0 [options] DIP.bed MRE.bed MRE_vdigest.bed"}
+
+# req arguments
 my (
-  $mdldir,  # has one model file per crf
-  $gdatdir, # has specifies-specific files: 1 cpg.bin for each crf, cpg.bed, gdtat.tbl
   $dipfn,   # MeDIP-seq file
   $mrefn,   # MRE-seq file
   $fragdir, # dir with MRE enzyme frag files -will detect if it's instead a filename and use that
-  $gapsz,   # size of gap
-  $eid,     # prefix for output files
-  $startfrom, # control which processes run
-  $goto,      # do go past this 
 ) = @ARGV;
 
 my ($crffn,$cutfn,$cpgfn,$gdatfn,$fragfn) = 
-   ("$mdldir/crf.list","$mdldir/cut.list","$gdatdir/cpg.bed","$gdatdir/gdata.tbl",$fragdir);
+   ("$c{-mdir}/crf.list","$c{-mdir}/cut.list","$c{-gdat}/cpg.bed","$c{-gdat}/gdata.tbl",$fragdir);
 
-if (!defined $startfrom) {$startfrom=0}
-if (!defined $goto)      {$goto=5     }
+# if dir then derive name [deprecated]
+if (-d $fragdir) { $fragfn  = $c{-eid}."_".qx(basename $fragdir); chomp $fragfn; }
 
-if (-d $fragdir) { $fragfn  = ${eid}."_".qx(basename $fragdir); chomp $fragfn; }
+
+
 
 # startfrom:
 # 0 all (format DIP/MRE bed files)
@@ -80,24 +95,24 @@ if (-d $fragdir) { $fragfn  = ${eid}."_".qx(basename $fragdir); chomp $fragfn; }
 ## 0: Get and Format DIP/MRE data ##
 
 # make correct bed files from handler output (dipfn.bed,mrefn.bed)
-if ($startfrom <=0 && $goto >= 0) {
+if ($c{-sfrom} <=0 && $c{-gto} >= 0) {
   print STDERR scalar localtime(), " format $dipfn and $mrefn\n";
   format_DIPMRE($dipfn,$mrefn,$cpgfn) 
 }
 
 ## 1: generate windowed files ({e}_DIP_d{d}.cnt, {e}_MRE_d{d}.cnt)
 my $win="0 10 100 1000 10000";
-if ($startfrom <=1 && $goto >= 1) {
+if ($c{-sfrom} <=1 && $c{-gto} >= 1) {
   print STDERR scalar localtime(), " make avg windows for $dipfn and $mrefn\n";
-  gen_avgwindows($eid,"$dipfn.norm.bed",$mrefn,$cpgfn,$win ) ;
+  gen_avgwindows($c{-eid},"$dipfn.norm.bed",$mrefn,$cpgfn,$win ) ;
 }
-if ($startfrom <=1.5 && $goto >= 1.5) {
+if ($c{-sfrom} <=1.5 && $c{-gto} >= 1.5) {
   print STDERR scalar localtime(), " making DIPMRE.cnt for $dipfn and $mrefn\n";
-  make_DIPMRE_cnt($eid, $win) ;
+  make_DIPMRE_cnt($c{-eid}, $win) ;
 }
 
 ## 2: make MRE frag file
-if ($fragdir ne $fragfn && $startfrom <=2 && $goto>=2 ) {
+if ($fragdir ne $fragfn && $c{-sfrom} <=2 && $c{-gto}>=2 ) {
   print STDERR scalar localtime(), " make MRE frag in $fragdir\n";
   make_fragfn($fragdir,$cpgfn,"$fragfn.bin");
 }
@@ -115,12 +130,12 @@ my $CPG = IO::File::AutoChomp->new($cpgfn,'r') or die "can't open $cpgfn: $!";
 # files have cpgid [0|1] -telling weather CpG is in crf (this is a bad idea, i need to redo it)
 # step (2,4)
 my @CLS =map { 
-    my $fn = "$gdatdir/${_}_cpg.bin";
+    my $fn = "$c{-gdat}/${_}_cpg.bin";
     IO::File::AutoChomp->new($fn, 'r') or die "can't open $fn: $!";
   } @crf;
 
 # CRF table fn's (step 2,3,4)
-my @tblfn = map{"${eid}_${_}.tbl"} (@crf);
+my @tblfn = map{"$c{-eid}_${_}.tbl"} (@crf);
 
 # get cut list hash (step 2,4[midpt])
 my (%cut,$id);
@@ -133,10 +148,10 @@ for (qx(cat $cutfn)) {
 
 
 ## 2: Make Tables ##
-if ($startfrom <=3 && $goto>=3) {
+if ($c{-sfrom} <=3 && $c{-gto}>=3) {
   print STDERR scalar localtime(), " make table\n";
   # get common filehandles
-  my $EFN  = IO::File::AutoChomp->new("${eid}_DIPMRE.cnt", 'r') or die "can't open ${eid}_DIPMRE.cnt $_: $!";
+  my $EFN  = IO::File::AutoChomp->new("$c{-eid}_DIPMRE.cnt", 'r') or die "can't open $c{-eid}_DIPMRE.cnt $_: $!";
   my $FRAG = IO::File::AutoChomp->new($fragfn,'r') or die "can't open $fragfn: $!";
   my $GDAT = IO::File::AutoChomp->new($gdatfn,'r') or die "can't open $gdatfn: $!";
   my @gdat_hdr = split /\t/,$GDAT->getline();
@@ -175,8 +190,9 @@ if ($startfrom <=3 && $goto>=3) {
       my $OUT   = $OUT[$cidx];
       my $crfnm = $crf[$cidx];
 
-      if ($goto == 3.1) {
+      if ($c{-gto} == 3.1) {
         ## tables for training: no gap or bin
+
         # MRE and MeDIP cols
         $OUT->print( $dipmre[$_+1],"\t" ) for (0..$#windist);
         $OUT->print( $dipmre[ $_+1+@windist ],"\t" ) for (0..$#windist);
@@ -191,8 +207,9 @@ if ($startfrom <=3 && $goto>=3) {
 
       } else { 
         ## tables for running mCRF
+
         # add newline for gaps
-        if ( $pchr[$cidx] && ($pchr[$cidx] ne $cpg[0] || ($cpg[1] -$plocn[$cidx] >$gapsz)) ) 
+        if ( $pchr[$cidx] && ($pchr[$cidx] ne $cpg[0] || ($cpg[1] -$plocn[$cidx] >$c{-gap})) ) 
         {$OUT->say("");}
   
         # MRE and MeDIP cols
@@ -219,14 +236,14 @@ if ($startfrom <=3 && $goto>=3) {
 
 
 ## 3: Predict ##
-if ($startfrom <= 4 && $goto>=4) {
+if ($c{-sfrom} <= 4 && $c{-gto}>=4) {
   print STDERR scalar localtime(), " predict\n";
-  predict($crfbin,\@tblfn,\@crf,$mdldir, $eid) 
+  predict($crfbin,\@tblfn,\@crf,$c{-mdir}, $c{-eid}) 
 }
   
 
 ## 4: Combine ##
-if ($startfrom<= 5 && $goto>=5) {
+if ($c{-sfrom}<= 5 && $c{-gto}>=5) {
 # midpt map
   my $midpt = midpt_map(\@crf,\%cut,1);
 
@@ -241,12 +258,12 @@ if ($startfrom<= 5 && $goto>=5) {
 
 }
 
-if ($startfrom == 6) {
-  my $d="${eid}_err";qx(mkdir $d; mv ${eid}*err $d/);
-  $d="${eid}_tbl";qx(mkdir $d; mv ${eid}*tbl $d/);
-  $d="${eid}_out";qx(mkdir $d; mv ${eid}*out $d/);
-  $d="${eid}_cnt";qx(mkdir $d; mv ${eid}*cnt $d/);
-#  $d="${eid}_bed";qx(mkdir $d; mv ${eid}*bed_cpg.bed *read.bed *norm.bed *extended.bed *bedGraph $d/);
+if ($c{-sfrom} == 6) {
+  my $d="$c{-eid}_err";qx(mkdir $d; mv $c{-eid}*err $d/);
+  $d="$c{-eid}_tbl";qx(mkdir $d; mv $c{-eid}*tbl $d/);
+  $d="$c{-eid}_out";qx(mkdir $d; mv $c{-eid}*out $d/);
+  $d="$c{-eid}_cnt";qx(mkdir $d; mv $c{-eid}*cnt $d/);
+#  $d="$c{-eid}_bed";qx(mkdir $d; mv $c{-eid}*bed_cpg.bed *read.bed *norm.bed *extended.bed *bedGraph $d/);
 }
 
 
@@ -312,7 +329,7 @@ sub combine {
 
 # prediction fh's
   my @pred= map { 
-  my $mname=qx(basename $mdldir);chomp $mname;
+  my $mname=qx(basename $c{-mdir});chomp $mname;
   IO::File::AutoChomp->new("${_}_$mname.out", 'r') or die "can't open ${_}_$mname.out: $!";
   } @$tblfn;
 
