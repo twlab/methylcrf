@@ -50,12 +50,25 @@ my %c = (
  -gdat  => 'gdat', # global species specific data: xxx_cpg.bin for each crf, cpg.bed, gdat.tbl
  -gap   => '750',  # size of gap
  -eid   => 'eid',  # prefix for output files
- -sfrom => '0',    # start from step
- -gto   => '5',    # don't go past this step
+
  -cpgfn => '',     # bed file of cpgs to use [dflt: gdat/cpg.bed]
  -crffn => '',     # crf list [dflt: mdir/crf.list]
  -cutfn => '',     # cut list for bining [dflt: mdir/cut.list]
  -gtbl =>  '',     # global data table [dflt:gdat/gdata.tbl]
+
+ # PROCESSING STEPS:
+ -sfrom => '0',    # start from step
+ -gto   => '5',    # don't go past this step
+    # 0 all (format DIP/MRE bed files)
+    # 1 DIP/MRE avgwin (25Gb)
+    # 1.5 DIP/MRE count files
+    # 2 make sampled MRE fragment file
+    # 3 make tables  (1.5hr)
+    # 3.1 make table for training: no binning or gaps
+    #     mCRF.pl xxxxxx   0 3.1
+    # 4 predict
+    # 5 combine
+    # 6 make dirs to put extra files in [have to give explicitely]
 );
 
 while ($ARGV[0] =~ /^-/) {
@@ -63,11 +76,11 @@ while ($ARGV[0] =~ /^-/) {
    if (exists $c{$_}) {$c{$_}= shift @ARGV}
    else {$c{$ARGV[0]}++ }
 }
-
 $c{-cpgfn}  ||= "$c{-gdat}/cpg.bed";
 $c{-crffn}  ||= "$c{-mdir}/crf.list";
 $c{-cutfn}  ||= "$c{-mdir}/cut.list";
 $c{-gtbl}   ||= "$c{-gdat}/gdata.tbl";
+
 
 
 # req arguments
@@ -86,17 +99,6 @@ if (-d $fragdir) { $fragfn  = $c{-eid}."_".qx(basename $fragdir); chomp $fragfn;
 
 
 
-# startfrom:
-# 0 all (format DIP/MRE bed files)
-# 1 DIP/MRE avgwin (25Gb)
-# 1.5 DIP/MRE count files
-# 2 make sampled MRE fragment file
-# 3 make tables  (1.5hr)
-# 3.1 make table for training: no binning or gaps
-#     mCRF.pl xxxxxx   0 3.1
-# 4 predict
-# 5 combine
-# 6 make dirs to put extra files in [have to give explicitely]
 
 
 ## 0: Get and Format DIP/MRE data ##
