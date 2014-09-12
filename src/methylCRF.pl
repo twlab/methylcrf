@@ -52,7 +52,10 @@ my %c = (
  -eid   => 'eid',  # prefix for output files
  -sfrom => '0',    # start from step
  -gto   => '5',    # don't go past this step
- -fltr  => '',     # file to filter CpGs on
+ -cpgfn => '',     # bed file of cpgs to use [dflt: gdat/cpg.bed]
+ -crffn => '',     # crf list [dflt: mdir/crf.list]
+ -cutfn => '',     # cut list for bining [dflt: mdir/cut.list]
+ -gtbl =>  '',     # global data table [dflt:gdat/gdata.tbl]
 );
 
 while ($ARGV[0] =~ /^-/) {
@@ -61,21 +64,25 @@ while ($ARGV[0] =~ /^-/) {
    else {$c{$ARGV[0]}++ }
 }
 
-if (@ARGV != 3) { die "USAGE $0 [options] DIP.bed MRE.bed MRE_vdigest.bed"}
+$c{-cpgfn}  ||= "$c{-gdat}/cpg.bed";
+$c{-crffn}  ||= "$c{-mdir}/crf.list";
+$c{-cutfn}  ||= "$c{-mdir}/cut.list";
+$c{-gtbl}   ||= "$c{-gdat}/gdata.tbl";
+
 
 # req arguments
+if (@ARGV != 3) { die "USAGE $0 [options] DIP.bed MRE.bed MRE_vdigest.bed"}
+
 my (
   $dipfn,   # MeDIP-seq file
   $mrefn,   # MRE-seq file
   $fragdir, # dir with MRE enzyme frag files -will detect if it's instead a filename and use that
 ) = @ARGV;
 
-my ($crffn,$cutfn,$cpgfn,$gdatfn,$fragfn) = 
-   ("$c{-mdir}/crf.list","$c{-mdir}/cut.list","$c{-gdat}/cpg.bed","$c{-gdat}/gdata.tbl",$fragdir);
 
 # if dir then derive name [deprecated]
+my $fragfn = $fragdir;
 if (-d $fragdir) { $fragfn  = $c{-eid}."_".qx(basename $fragdir); chomp $fragfn; }
-
 
 
 
@@ -97,14 +104,14 @@ if (-d $fragdir) { $fragfn  = $c{-eid}."_".qx(basename $fragdir); chomp $fragfn;
 # make correct bed files from handler output (dipfn.bed,mrefn.bed)
 if ($c{-sfrom} <=0 && $c{-gto} >= 0) {
   print STDERR scalar localtime(), " format $dipfn and $mrefn\n";
-  format_DIPMRE($dipfn,$mrefn,$cpgfn) 
+  format_DIPMRE($dipfn,$mrefn,$c{-cpgfn}) 
 }
 
 ## 1: generate windowed files ({e}_DIP_d{d}.cnt, {e}_MRE_d{d}.cnt)
 my $win="0 10 100 1000 10000";
 if ($c{-sfrom} <=1 && $c{-gto} >= 1) {
   print STDERR scalar localtime(), " make avg windows for $dipfn and $mrefn\n";
-  gen_avgwindows($c{-eid},"$dipfn.norm.bed",$mrefn,$cpgfn,$win ) ;
+  gen_avgwindows($c{-eid},"$dipfn.norm.bed",$mrefn,$c{-cpgfn},$win ) ;
 }
 if ($c{-sfrom} <=1.5 && $c{-gto} >= 1.5) {
   print STDERR scalar localtime(), " making DIPMRE.cnt for $dipfn and $mrefn\n";
@@ -114,7 +121,7 @@ if ($c{-sfrom} <=1.5 && $c{-gto} >= 1.5) {
 ## 2: make MRE frag file
 if ($fragdir ne $fragfn && $c{-sfrom} <=2 && $c{-gto}>=2 ) {
   print STDERR scalar localtime(), " make MRE frag in $fragdir\n";
-  make_fragfn($fragdir,$cpgfn,"$fragfn.bin");
+  make_fragfn($fragdir,$c{-cpgfn},"$fragfn.bin");
 }
  
 
@@ -122,10 +129,10 @@ if ($fragdir ne $fragfn && $c{-sfrom} <=2 && $c{-gto}>=2 ) {
 ## stuff needed for steps (3,4,5) ##
 
 # crf list
-my @crf = map {chomp;$_} qx(cat $crffn|grep -v "^#"); 
+my @crf = map {chomp;$_} qx(cat $c{-crffn}|grep -v "^#"); 
 
 # genomic cpg.bed (step 2,3,4)
-my $CPG = IO::File::AutoChomp->new($cpgfn,'r') or die "can't open $cpgfn: $!";
+my $CPG = IO::File::AutoChomp->new($c{-cpgfn},'r') or die "can't open $c{-cpgfn}: $!";
 
 # files have cpgid [0|1] -telling weather CpG is in crf (this is a bad idea, i need to redo it)
 # step (2,4)
@@ -139,7 +146,7 @@ my @tblfn = map{"$c{-eid}_${_}.tbl"} (@crf);
 
 # get cut list hash (step 2,4[midpt])
 my (%cut,$id);
-for (qx(cat $cutfn)) {
+for (qx(cat $c{-cutfn})) {
   chomp;
   if (/[a-zA-Z]/) { $id=$_                 }
   else            { push @{$cut{$id}},$_+0 }
@@ -153,7 +160,7 @@ if ($c{-sfrom} <=3 && $c{-gto}>=3) {
   # get common filehandles
   my $EFN  = IO::File::AutoChomp->new("$c{-eid}_DIPMRE.cnt", 'r') or die "can't open $c{-eid}_DIPMRE.cnt $_: $!";
   my $FRAG = IO::File::AutoChomp->new($fragfn,'r') or die "can't open $fragfn: $!";
-  my $GDAT = IO::File::AutoChomp->new($gdatfn,'r') or die "can't open $gdatfn: $!";
+  my $GDAT = IO::File::AutoChomp->new($c{-gtbl},'r') or die "can't open $c{-gtbl}: $!";
   my @gdat_hdr = split /\t/,$GDAT->getline();
 
   # per CRF fh's (these should close as they go out of scope)
@@ -168,11 +175,12 @@ if ($c{-sfrom} <=3 && $c{-gto}>=3) {
     my (@dipmre,@frag,@gdat);
     while (1) {
       @dipmre = (split /\t/,  $EFN->getline());chomp $dipmre[-1];
-     # $frag   = (split /\t/, $FRAG->getline())[1];
       @frag   = (split /\t/, $FRAG->getline());chomp $frag[-1];
       @gdat   = (split /\t/, $GDAT->getline()); chomp $gdat[-1];
-      die "at cpg: $cid ($dipmre[0] != $frag[0] != $gdat[0])" if grep {$_ ne $dipmre[0]} ($frag[0],$gdat[0]);
-      last if $dipmre[0] eq $cid;
+      if ($dipmre[0] eq $cid) {
+       die "at cpg: $cid ($dipmre[0] != $frag[0] != $gdat[0])" if grep {$_ ne $dipmre[0]} ($frag[0],$gdat[0]);
+       last;
+      }
     }
 
     # each crf
