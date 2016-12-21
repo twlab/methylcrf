@@ -31,7 +31,8 @@ for d in $win; do
   echo "$d" >&2
   awk '{OFS="\t";$2-=($2<D)?0:D;$3+=D;print}' D=$d $cpg > $tmp 
   out=${outtmp}_d${d}.cnt
-  olapBed -s $bed $tmp | awk '{printf("%s\t%."F"f\n",$4,$NF)}' F=$fmt >$out
+  mapBed -b $bed -a $tmp -o sum | awk '{printf("%s\t%."F"f\n",$4,$NF)}' F=$fmt >$out
+  # olapBed -s $bed $tmp | awk '{printf("%s\t%."F"f\n",$4,$NF)}' F=$fmt >$out
 #  ls -l $out  >&2
 done;
 rm $tmp

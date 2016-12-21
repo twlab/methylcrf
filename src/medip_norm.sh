@@ -31,7 +31,8 @@ done;
 
 # calc reads over every CpG
 dipreadbed=cpg_${dip/.bed/}_read.bed
-olapBed -s $dip $cpg|awk '{OFS="\t";$4=".";$5=$NF;NF=6;print}' > $dipreadbed
+mapBed -b $dip -a $cpg -o sum | awk '{OFS="\t";$4=".";$5=$NF;NF=6;print}' > $dipreadbed
+# olapBed -s $dip $cpg|awk '{OFS="\t";$4=".";$5=$NF;NF=6;print}' > $dipreadbed
 ls -l $dipreadbed >&2
 
 # normalize to 75th percentile
@@ -41,7 +42,8 @@ echo "p75:$p75 P75cnt:$p75cnt" >&2
 
 ## ~8Gb
 dipcpgbed=${dip/.bed/}_$(basename $cpg)
-olapBed -c $cpg $dip | awk '{OFS="\t";$5=$NF;NF=5;print}' > $dipcpgbed
+olapBed -b $cpg -a $dip -o count | awk '{OFS="\t";$5=$NF;NF=5;print}' > $dipcpgbed
+# olapBed -c $cpg $dip | awk '{OFS="\t";$5=$NF;NF=5;print}' > $dipcpgbed
 
 # split count amongst cpgs and normalize (mutiplicatively) so 75th percentile will be 10
 # NOTE: MeDIP has chrM, cpg doesnt

@@ -9,13 +9,13 @@ methylCRF.pl: MRE_norm.pl medip_norm.sh crfasgd bed2avgwinbin.sh dir2frag.sh sam
 MRE_norm.pl:
 	ln -s src/MRE_norm.pl ./
 
-bed2avgwinbin.sh: olapBed
+bed2avgwinbin.sh: mapBed
 	ln -s src/bed2avgwinbin.sh ./
 
-dir2frag.sh: olapBed
+dir2frag.sh: mapBed
 	ln -s src/dir2frag.sh ./
 
-medip_norm.sh:
+medip_norm.sh: mapBed
 	ln -s src/medip_norm.sh ./
 
 sam2bed.pl:
@@ -25,14 +25,17 @@ crfasgd:
 	cd src/sgd/crf; make; cd ../../../;
 	ln -s src/sgd/crf/crfasgd ./
 
-olapBed: 
-	cd src/olapBed; make; cd ../../;
-	ln -s src/olapBed/olapBed ./
+mapBed:
+	ln -s /usr/local/bin/mapBed ./
+
+# olapBed: 
+# 	cd src/olapBed; make; cd ../../;
+# 	ln -s src/olapBed/olapBed ./
 
 clean:
-	-rm methylCRF.pl MRE_norm.pl sam2bed.pl medip_norm.sh crfasgd bed2avgwinbin.sh dir2frag.sh olapBed 2>/dev/null
+	-rm methylCRF.pl MRE_norm.pl sam2bed.pl medip_norm.sh crfasgd bed2avgwinbin.sh dir2frag.sh mapBed 2>/dev/null
 	cd src/sgd; make clean; cd ../../;
-	cd src/olapBed; make clean; cd ../
+	# cd src/olapBed; make clean; cd ../
 
 
 .PHONY: all clean
