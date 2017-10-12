@@ -18,7 +18,7 @@
 #------------------------------------------------------------------------#
 
 # req 
-#  olapBed
+#  mapBed
 
 dip=$1;   # dipfn
 cpg=$2;   # all cpg file
@@ -28,6 +28,9 @@ for i in $dip $cpg; do
   if [ ! -e $i ]; then echo "$i not exist!" >&2; exit 1; fi;
 done;
 
+# sort both dip/mre and cpg bed file, so I can use mapbed instead of olapbed.
+sort -k1,1V -k2,2n -o $dip $dip
+sort -k1,1V -k2,2n -o $cpg $cpg
 
 # calc reads over every CpG
 dipreadbed=cpg_${dip/.bed/}_read.bed
@@ -42,12 +45,13 @@ echo "p75:$p75 P75cnt:$p75cnt" >&2
 
 ## ~8Gb
 dipcpgbed=${dip/.bed/}_$(basename $cpg)
-olapBed -b $cpg -a $dip -o count | awk '{OFS="\t";$5=$NF;NF=5;print}' > $dipcpgbed
+mapBed -b $cpg -a $dip -o count | awk '{OFS="\t";$5=$NF;NF=5;print}' > $dipcpgbed
 # olapBed -c $cpg $dip | awk '{OFS="\t";$5=$NF;NF=5;print}' > $dipcpgbed
 
 # split count amongst cpgs and normalize (mutiplicatively) so 75th percentile will be 10
 # NOTE: MeDIP has chrM, cpg doesnt
-awk '($5){$5=(10/P)*(1/$5)}{OFS="\t";;print}' P=$p75cnt $dipcpgbed
+awk 'BEGIN{OFS="\t"}($5){$5=(10/P)*(1/$5)}{print}' P=$p75cnt $dipcpgbed
+# awk '($5){$5=(10/P)*(1/$5)}{OFS="\t";;print}' P=$p75cnt $dipcpgbed  # origninal, seems wrong?
  
 
 
