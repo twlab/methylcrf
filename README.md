@@ -15,7 +15,7 @@ Because of bedtools requirement, please make sure all the bed files used for the
 
 ## How to install:
 
-* step1: open Makefile with your favorite text editor, and replace "/usr/local/bin/mapBed" in line 29 with the path to mapBed on your machine.
+* step1: install bedtools.
 * step2: make
 
 Enjoy!
