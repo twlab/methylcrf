@@ -1,4 +1,9 @@
-# methylCRF 1.1
+# methylCRF 1.2
+
+Because of bedtools requirement, please make sure all the bed files used for the tool has been sorted using `sort -k1,1V -k2,2n`
+
+## 1.2 update:
+* sort bedfiles before mapBed
 
 ## 1.1 update: 
 * Replace olapBed with mapBed in bedtools
