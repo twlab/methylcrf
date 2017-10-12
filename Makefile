@@ -25,17 +25,13 @@ crfasgd:
 	cd src/sgd/crf; make; cd ../../../;
 	ln -s src/sgd/crf/crfasgd ./
 
-mapBed:
-	ln -s /usr/local/bin/mapBed ./
+# mapBed:  # just install it
+#	ln -s /usr/local/bin/mapBed ./
 
-# olapBed: 
-# 	cd src/olapBed; make; cd ../../;
-# 	ln -s src/olapBed/olapBed ./
 
 clean:
-	-rm methylCRF.pl MRE_norm.pl sam2bed.pl medip_norm.sh crfasgd bed2avgwinbin.sh dir2frag.sh mapBed 2>/dev/null
-	cd src/sgd; make clean; cd ../../;
-	# cd src/olapBed; make clean; cd ../
+	-rm methylCRF.pl MRE_norm.pl sam2bed.pl medip_norm.sh crfasgd bed2avgwinbin.sh dir2frag.sh 2>/dev/null
+	cd src/sgd/crf; make clean; cd ../../../;
 
 
 .PHONY: all clean
