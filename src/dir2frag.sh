@@ -18,10 +18,10 @@
 #------------------------------------------------------------------------#
 
 # req 
-#  olapBed
+#  mapBed, but not tested.
 
 tmp=$(mktemp $0.XXXXXX.tmp)
-cat $1/* |cut -f1,2,3|sort -u >$tmp
+cat $1/* |cut -f1,2,3|sort -u |sort -k1,1V -k2,2n >$tmp
 mapBed -b $tmp -a $2 -o count | awk '{OFS="\t";print $4,!!$7}'
 # olapBed -c $tmp $2 |awk '{OFS="\t";print $4,!!$7}' 
 rm $tmp
