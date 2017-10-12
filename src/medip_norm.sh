@@ -53,5 +53,3 @@ mapBed -b $cpg -a $dip -o count | awk '{OFS="\t";$5=$NF;NF=5;print}' > $dipcpgbe
 awk 'BEGIN{OFS="\t"}($5){$5=(10/P)*(1/$5)}{print}' P=$p75cnt $dipcpgbed
 # awk '($5){$5=(10/P)*(1/$5)}{OFS="\t";;print}' P=$p75cnt $dipcpgbed  # origninal, seems wrong?
  
-
-
