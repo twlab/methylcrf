@@ -1,4 +1,5 @@
 
 *.tmp
+.nfs*
 olapBed
 galGal4_gdat/
