@@ -28,6 +28,7 @@ crfasgd:
 # mapBed: bedtools should be installed
 #	ln -s /opt/apps/bedtools/2.25.0/bin/mapBed ./
 
+
 clean:
 	-rm methylCRF.pl MRE_norm.pl sam2bed.pl medip_norm.sh crfasgd bed2avgwinbin.sh dir2frag.sh 2>/dev/null
 	cd src/sgd/crf; make clean; cd ../../../;

@@ -72,9 +72,9 @@ if ((2**2)&$F[1]) { $unmapped{"$F[1] $F[2]"}++ if ($a{-r});next }
 
 my $re = $a{-chr} ? $a{-chr} : "chr";
 my $chr = $F[2];
-# if ($chr =~ m/^(\d+|[XYM]|MT)$/) { $chr ="chr$chr"}              # add chr to some misnamed sequences
-# elsif ($chr =~ /^GL\d+/)         { $contigcnt++; next}           # skip these (dont know what else to do)
-# elsif ($chr !~ /^($re)/)         { warn "whatchrom:$_ \n"; next} # dont know what else to do
+if ($chr =~ m/^(\d+|[XYM]|MT)$/) { $chr ="chr$chr"}              # add chr to some misnamed sequences
+elsif ($chr =~ /^GL\d+/)         { $contigcnt++; next}           # skip these (dont know what else to do)
+elsif ($chr !~ /^($re)/)         { warn "whatchrom:$_ \n"; next} # dont know what else to do
 
 #match legacy
 $chr =~ s/chrMT/chrM/;
