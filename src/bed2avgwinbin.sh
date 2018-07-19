@@ -25,8 +25,8 @@ cpg=$2;
 win=$3;     # space separated window size list in quotes: "0 10 100"
 outtmp=$4;  #out_fn template: <outtmp>_d[dist].cnt
 fmt=2;      # printing number of significant aftr 
-sort -k1,1V -k2,2n -o $bed $bed
-sort -k1,1V -k2,2n -o $cpg $cpg
+# sort -k1,1V -k2,2n -o $bed $bed
+# sort -k1,1V -k2,2n -o $cpg $cpg
 
 tmp=$(mktemp $0.XXXXXX.tmp)
 for d in $win; do
@@ -35,10 +35,10 @@ for d in $win; do
   # awk '{OFS="\t";$2-=($2<D)?0:D;$3+=D;print}' D=$d $cpg > $tmp
   # sort -k1,1V -k2,2n -o $tmp $tmp
   out=${outtmp}_d${d}.cnt
-  # out_temp=${outtmp}_d${d}.temp.cnt  # test temp
-  mapBed -b $bed -a $tmp -o sum | awk '{printf("%s\t%."F"f\n",$4,$NF)}' F=$fmt >$out  # test temp
-  # olapBed -s $bed $tmp | awk '{printf("%s\t%."F"f\n",$4,$NF)}' F=$fmt >$out_temp
-  # cmp --silent $out $out_temp || echo "diff in bed2avgwinbin"  # test temp
+  out_temp=${outtmp}_d${d}.test.cnt  # test temp
+  mapBed -b $bed -a $tmp -o sum -null 0 |awk '{printf("%s\t%."F"f\n",$4,$NF)}' F=$fmt >$out  # olapBed has .5F while mapBed has .6F. round up to .2F and there will be a tiny difference.
+  # mapBed -b $bed -a $tmp -o sum -null 0 |awk '{printf("%s\t%.6f\n",$4,$NF)}' |awk '{printf("%s\t%."F"f\n",$1,$2)}' F=$fmt >$out  # exactly like olapbed.
+  # olapBed -s $bed $tmp | awk '{printf("%s\t%."F"f\n",$4,$NF)}' F=$fmt >$out
 #  ls -l $out  >&2
 done;
 rm $tmp

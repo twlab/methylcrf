@@ -98,7 +98,11 @@ my $fragfn = $fragdir;
 if (-d $fragdir) { $fragfn  = $c{-eid}."_".qx(basename $fragdir); chomp $fragfn; }
 
 
-
+## sort -k1,1V -k2,2n
+qx(sort -k1,1V -k2,2n -k3,3n -o cpg.sort.bed $c{-cpgfn});
+qx(sort -k1,1V -k2,2n -k3,3n -o $dipfn $dipfn);
+qx(sort -k1,1V -k2,2n -k3,3n -o $mrefn $mrefn);
+$c{-cpgfn} = 'cpg.sort.bed';
 
 
 ## 0: Get and Format DIP/MRE data ##

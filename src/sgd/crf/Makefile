@@ -34,11 +34,11 @@ clean:
 	-rm *.o 2>/dev/null
 
 crfsgd: crfsgd.o ${OBJS}
-	-rm $@ 2>/dev/null
+	# -rm $@ 2>/dev/null
 	${CXX} ${CXXFLAGS} -o $@ crfsgd.o ${OBJS} ${LIBS}
 
 crfasgd: crfasgd.o ${OBJS}
-	-rm $@ 2>/dev/null
+	# -rm $@ 2>/dev/null
 	${CXX} ${CXXFLAGS} -o $@ crfasgd.o ${OBJS} ${LIBS}
 
 crfsgd.o: crfsgd.cpp $L/vectors.h  $L/gzstream.h $L/timer.h
